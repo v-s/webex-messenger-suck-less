@@ -1,0 +1,37 @@
+{
+  "manifest_version": 2,
+
+  "name": "Webex Messenger Suck-Less",
+  "description": "Makes Webex Messenger suck less by adding features such as new-message notification etc.",
+  "version": "1.0",
+  "icons" : {
+    "16" : "webex_icon.png",
+    "48" : "webex_icon.png",
+    "128" : "webex_icon.png"
+  },
+
+  "permissions": [
+    "https://im1.ciscowebex.com/*",
+    "alarms",
+    "notifications",
+    "storage"
+  ],
+  "browser_action": {
+    "default_icon": "webex_icon_mono.png"
+  },
+  "background": {
+    "scripts": ["jquery-2.1.1.min.js", "webex-messenger-helper.js"],
+    "persistent": false
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://im1.ciscowebex.com/*"],
+      "js": ["jquery-2.1.1.min.js", "webex-messenger-interface.js"]
+    }
+  ],
+  "web_accessible_resources": [
+    "blue_important_icon.png",
+    "global_vars_access_hack.js",
+    "webex_icon.png"
+  ]
+}
