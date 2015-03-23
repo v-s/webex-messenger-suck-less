@@ -1,3 +1,5 @@
+var BADGE_ICON_ACTIVE = 'webex_icon.png';
+var BADGE_ICON_INACTIVE = 'webex_icon_mono.png';
 var WEBEX_IM_URL_PATTERN = 'https://im1.ciscowebex.com/webim/*';
 var WEBEX_IM_SSO_LOGIN_URL = 'https://loginp.webexconnect.com/cas/FederatedSSO.do?type=webim&org=guidewire.com&target=https%3A%2F%2Floginp.webexconnect.com%2Fcas%2Fsso%2Fguidewire.com%2Fwebim.app';
 var WEBEX_IM_POLL_ALARM_NAME = 'pollWebexWebIM';
@@ -6,7 +8,7 @@ chrome.browserAction.setBadgeBackgroundColor({color : '#ff0000'});
 
 chrome.browserAction.onClicked.addListener(function() {
   chrome.browserAction.setBadgeText({'text' : ''})
-  activateMessengerTab();
+  activateIMTab();
 });
 
 chrome.runtime.onInstalled.addListener(function(details) {
@@ -22,7 +24,7 @@ chrome.runtime.onInstalled.addListener(function(details) {
           priority: 2
         },
         function(notificationId) {
-          activateMessengerTabOnNotificationClick(notificationId);
+          activateIMTabOnNotificationClick(notificationId);
         }
       );
     }
@@ -36,13 +38,14 @@ chrome.runtime.onInstalled.addListener(function(details) {
 
 chrome.alarms.onAlarm.addListener(function(alarm) {
   if (alarm.name == WEBEX_IM_POLL_ALARM_NAME) {
-    queryWebexPage(retrieveMessages);
+    queryWebexPage(retrieveIMs);
   }
 });
 
-function activateMessengerTab() {
+function activateIMTab() {
   queryWebexPage(function(tab) {
     chrome.tabs.update(tab.id, {active : true});
+    updateBadgeIconAndTextWithIMCount(0);
   });
 }
 
@@ -54,44 +57,43 @@ function queryWebexPage(callback) {
         index: 0,
         url: WEBEX_IM_SSO_LOGIN_URL
       }, callback);
-    } else if (!tabs[0].active) { // Don't notify if user is already on IM page.
+    } else if (tabs[0].active) { // Clear notifications if user is already on IM page.
+      updateBadgeIconAndTextWithIMCount(0);
+    } else {
       callback(tabs[0]);
     }
   });
 }
 
-function retrieveMessages(tab) {
-  var tabID = tab.id
-  chrome.tabs.sendMessage(tabID, {}, function(response) {
-    if(!response) {
-      chrome.browserAction.setBadgeText({'text' : 'ERR'})
-      return
+function retrieveIMs(tab) {
+  chrome.storage.sync.get('lastSeenIMs', function(data) {
+    if (!data.lastSeenIMs) {
+      data.lastSeenIMs = {};
     }
 
-    chrome.storage.sync.get(null, function(data) {
-      var numMessages = 0;
-      var iconUrl = 'webex_icon_mono.png';
-      var badgeText = '';
+    chrome.tabs.sendMessage(tab.id, {'lastSeenIMs': data.lastSeenIMs}, function(response) {
+      if(!response) {
+        chrome.browserAction.setBadgeText({'text' : 'ERR'});
+        return
+      }
 
-      var newMessages = response.messages;
-      var dataToUpdateInStore = {};
-      for(var sender in newMessages) {
-        var senderMessages = newMessages[sender];
-        var numSenderMessages = senderMessages.length;
-        numMessages += numSenderMessages;
-        var latestMsgFromSender = senderMessages[numSenderMessages - 1].text;
+      var numIMs = 0;
+      var newIMs = response.newIMs;
+      var dataToUpdateInStore = data;
 
-        if (data[sender] && latestMsgFromSender === data[sender]) {
-          continue;
-        }
+      for(var sender in newIMs) {
+        var senderIMs = newIMs[sender];
+        var numSenderIMs = senderIMs.length;
+        numIMs += numSenderIMs;
+        var latestIMFromSender = senderIMs[numSenderIMs - 1].text;
 
-        dataToUpdateInStore[sender] = latestMsgFromSender;
+        dataToUpdateInStore.lastSeenIMs[sender] = latestIMFromSender;
 
         var notificationMessagesList = [];
-        $(senderMessages).each(function(idx, message) {
+        $(senderIMs).each(function(idx, im) {
           notificationMessagesList.push({
-            title: message.timestamp,
-            message: message.text
+            title: im.timestamp,
+            message: im.text
           });
         });
 
@@ -101,33 +103,40 @@ function retrieveMessages(tab) {
             type: 'list',
             title : sender,
             message: '',
-            iconUrl : 'webex_icon.png',
+            iconUrl : BADGE_ICON_ACTIVE,
             items: notificationMessagesList,
             priority: 2
           },
           function(notificationId) {
-            activateMessengerTabOnNotificationClick(notificationId);
+            activateIMTabOnNotificationClick(notificationId);
           }
         );
       }
 
       chrome.storage.sync.set(dataToUpdateInStore, function() {});
-
-      if(numMessages > 0) {
-        iconUrl = 'webex_icon.png'
-        badgeText = String(numMessages)
-      }
-
-      chrome.browserAction.setIcon({'path' : iconUrl})
-      chrome.browserAction.setBadgeText({'text' : badgeText})
+      updateBadgeIconAndTextWithIMCount(numIMs);
     });
   });
 }
 
-function activateMessengerTabOnNotificationClick(notificationId) {
+function updateBadgeIconAndTextWithIMCount(numIMs) {
+  var badgeIconUrl, badgeText;
+  if (numIMs > 0) {
+    badgeIconUrl = BADGE_ICON_ACTIVE;
+    badgeText = String(numIMs);
+  } else {
+    badgeIconUrl = BADGE_ICON_INACTIVE;
+    badgeText = '';
+  }
+
+  chrome.browserAction.setIcon({'path' : badgeIconUrl});
+  chrome.browserAction.setBadgeText({'text' : badgeText});
+}
+
+function activateIMTabOnNotificationClick(notificationId) {
   chrome.notifications.onClicked.addListener(function(clickedNotificationId) {
     if (clickedNotificationId === notificationId) {
-      activateMessengerTab();
+      activateIMTab();
     }
   });
 }

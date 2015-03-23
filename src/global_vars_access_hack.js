@@ -7,13 +7,12 @@ setInterval(function() {
   webim.ILDAPService.SearchUsersByKey('Han', 'Solo' + new Date().getTime(), '', '1', function(a) {});
 }, 30000);
 
-// TODO: Put this whole abomination to a worthwile cause. Hook into webim's MessageManager.OnMsgReceived event to get
+// TODO: Put this whole abomination to a more worthwile cause. Hook into webim's MessageManager.OnMsgReceived event to get
 // notified of (and thus handle) new messages. This would beat the hell out of the current UI-scrapping approach.
-/*setTimeout(function() {
-  webim.util.subscribe("????",this,"myMessageHandler");
+setTimeout(function() {
   document.dispatchEvent(new CustomEvent('webexMessengerSuckLess_globalVarAccessHack', {
-      detail: {'newMessage': {foo: bar}},
+      detail: {'loggedInUser': webim.main.userName},
       bubbles: true,
       cancelable: false
   }));
-}, 0);*/
+}, 0);

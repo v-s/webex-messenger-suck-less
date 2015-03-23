@@ -5,33 +5,41 @@ globalVarsAccessHackScript.onload = function() {
     globalVarsAccessHackScript.parentNode.removeChild(globalVarsAccessHackScript);
 };
 
-chrome.runtime.onMessage.addListener(
-  function(request, sender, sendResponse) {
-    var loggedInUser = $('#webim_main_showuser').attr('title');
-  	var newMessages = {};
+document.addEventListener('webexMessengerSuckLess_globalVarAccessHack', function(e) {
+  var loggedInUser = e.detail.loggedInUser;
 
-    $('div.IMDialog.webim_onDialogNewMsgReceived').each(function() {
-      var thisElt = $(this);
-      var sender = thisElt.find('div.userName').text();
+  chrome.runtime.onMessage.addListener(
+    function(request, sender, sendResponse) {
+      var lastSeenIMs = request.lastSeenIMs;
+    	var newIMs = {};
 
-      thisElt.find('div.msg').each(function() {
-        var msgElt = $(this);
+      $('div.IMDialog').each(function() {
+        var thisElt = $(this);
+        var imSender = thisElt.find('div.userName').text();
+        var lastSeenIMFromSender = lastSeenIMs[imSender];
 
-        if(msgElt.siblings('div.buddyName').text().match(new RegExp('^' + loggedInUser + '.*', 'i'))) {
-          newMessages[sender] = [];
-        } else {
-          if (!newMessages[sender]) {
-            newMessages[sender] = [];
+        thisElt.find('div.msg').each(function() {
+          var imElt = $(this);
+          var currentIMSender = imElt.siblings('div.buddyName').attr('jid');
+          var imText = imElt.find('span.msgText').text().trim();
+          
+          // Skip outgoing messages and already seen incoming messages.
+          if((currentIMSender === loggedInUser) || (lastSeenIMFromSender && imText === lastSeenIMFromSender)) {
+            newIMs[imSender] = [];
+          } else {
+            if (!newIMs[imSender]) {
+              newIMs[imSender] = [];
+            }
+
+            var im = {};
+            im.text = imText;
+            im.timestamp = imElt.find('span.timeStamp').text().trim();
+            newIMs[imSender].push(im);
           }
+        });
+    	});
 
-          var message = {};
-          message.text = msgElt.find('span.msgText').text().trim();
-          message.timestamp = msgElt.find('span.timeStamp').text().trim();
-          newMessages[sender].push(message);
-        }
-      });
-  	});
-
-  	sendResponse({messages : newMessages});
-  }
-);
+    	sendResponse({'newIMs' : newIMs});
+    }
+  );
+});
